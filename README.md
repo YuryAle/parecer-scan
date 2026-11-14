@@ -1,10 +1,22 @@
-# Parecer Scan
+# CAMED Scan
 
 App leve para o acionamento médico: tira foto do **pedido de parecer**, deixa nítido, lê os dados com IA, guarda em **pastas por especialidade** e monta a **planilha do plantão** pronta para colar no Google Sheets (CAMED – Escala de Parecer).
 
 Sem propaganda, sem cadastro, sem loja de apps. Os pareceres ficam salvos **só no celular**.
 
-## Como instalar no celular (Android)
+## App Android (.apk)
+
+Baixe sempre a versão mais nova em:
+**https://github.com/YuryAle/parecer-scan/releases/latest/download/CAMED-Scan.apk**
+
+No app, as cópias em PDF ficam em **Documentos/CAMED Scan/ESPECIALIDADE**. Em *Ajustes → Atualização* há o botão **Verificar atualização**; o app também avisa na tela inicial quando sai versão nova.
+
+### Lançar uma versão nova
+1. Aumente `VERSAO` em `js/versao.js` (ex.: 1.1.0 → 1.2.0).
+2. Crie a tag igual (`v1.2.0`) e envie. O GitHub gera o APK assinado e publica em *Releases*.
+3. O segredo `SENHA_ASSINATURA` (Settings → Secrets and variables → Actions) precisa existir. A chave fica em `assinatura/camed-scan.p12`; sem a senha ela não serve. Não troque a chave, senão o celular não aceita a atualização por cima.
+
+## Usar pelo navegador (site)
 
 1. Abra o link do app no **Chrome**.
 2. Toque nos 3 pontinhos ⋮ → **Adicionar à tela inicial** (ou **Instalar app**).

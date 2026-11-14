@@ -1,0 +1,57 @@
+name: Gerar APK Android
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir a senha da assinatura
+        env:
+          SENHA_ASSINATURA: ${{ secrets.SENHA_ASSINATURA }}
+        run: |
+          if [ -z "$SENHA_ASSINATURA" ]; then
+            echo "::error::Falta o segredo SENHA_ASSINATURA em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Versão
+        id: v
+        run: |
+          V=$(grep -oP "VERSAO = '\K[0-9.]+" js/versao.js)
+          echo "versao=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Montar e assinar o APK
+        env:
+          SENHA_ASSINATURA: ${{ secrets.SENHA_ASSINATURA }}
+        run: bash .github/scripts/montar-android.sh "${{ steps.v.outputs.versao }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CAMED-Scan-${{ steps.v.outputs.versao }}
+          path: CAMED-Scan.apk
+
+      - name: Publicar versão
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CAMED Scan ${{ steps.v.outputs.versao }}
+          files: CAMED-Scan.apk
+          make_latest: true

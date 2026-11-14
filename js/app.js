@@ -2,6 +2,8 @@ import * as db from './db.js';
 import * as scan from './scan.js';
 import { lerComGemini, lerNoCelular, escolherModelo } from './ai.js';
 import { jpegParaPdf } from './pdf.js';
+import { ehApp, salvarNoCelular, apagarDoCelular, compartilharNoApp, copiarTexto, abrirLink, buscarAtualizacao } from './nativo.js';
+import { VERSAO, LINK_APK } from './versao.js';
 import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, MEDICOS_PADRAO, melhorBloco, melhorOpcao, normalizar, textoParaLista, regraCardiologia } from './lists.js';
 
 // ================= Configurações =================
@@ -99,7 +101,7 @@ $('#voltar').onclick = voltar;
 
 // ================= Tela inicial / Escanear =================
 async function telaInicio() {
-  titulo('Parecer Scan');
+  titulo('CAMED Scan');
   const todos = await db.listar();
   const hoje = dataBR(new Date());
   const deHoje = todos.filter(p => p.data === hoje);
@@ -112,6 +114,7 @@ async function telaInicio() {
     ${falta.length ? `<div class="cartao" style="border-left:4px solid var(--amarelo)">
       <b>Falta configurar:</b> ${falta.join(' e ')}.<br>
       <button class="btn sec" style="margin-top:8px" data-ir="config">Abrir ajustes</button></div>` : ''}
+    <div id="banner-atualizacao"></div>
     <button class="btn grande cheio" id="tirar">📷 Tirar foto do parecer</button>
     <div class="linha-btns" style="margin:10px 0 16px">
       <button class="btn sec" id="da-galeria">🖼️ Escolher da galeria</button>
@@ -127,6 +130,41 @@ async function telaInicio() {
   $('#da-galeria').onclick = () => $('#galeria').click();
   tela.querySelector('[data-ir]')?.addEventListener('click', () => irAba('config'));
   desenharItens($('#recentes'), deHoje.slice(0, 15));
+  mostrarBannerAtualizacao();
+}
+
+// ---------- Atualização ----------
+let ultimaBusca = null;
+async function checarAtualizacao(forcar = false) {
+  const agora = Date.now();
+  const salvo = JSON.parse(localStorage.getItem('atualizacao') || 'null');
+  if (!forcar && salvo && agora - salvo.quando < 6 * 3600e3) return salvo.info;
+  const info = await buscarAtualizacao();
+  localStorage.setItem('atualizacao', JSON.stringify({ quando: agora, info }));
+  return info;
+}
+
+async function mostrarBannerAtualizacao() {
+  const el = $('#banner-atualizacao');
+  if (!el) return;
+  if (!ehApp()) {
+    el.innerHTML = `<div class="cartao pequeno">📱 Prefere o app instalado? <a href="${LINK_APK}">Baixar o CAMED Scan para Android (.apk)</a></div>`;
+    return;
+  }
+  try {
+    ultimaBusca = ultimaBusca || await checarAtualizacao();
+    if (ultimaBusca.tem && $('#banner-atualizacao')) {
+      $('#banner-atualizacao').innerHTML = `<div class="cartao" style="border-left:4px solid var(--verde)">
+        <b>Nova versão ${esc(ultimaBusca.versao)} disponível</b>
+        <button class="btn verde cheio" style="margin-top:8px" id="baixar-att">⬇️ Atualizar agora</button></div>`;
+      $('#baixar-att').onclick = () => instalarAtualizacao(ultimaBusca);
+    }
+  } catch {}
+}
+
+function instalarAtualizacao(info) {
+  alert('O arquivo da nova versão vai ser baixado.\n\nQuando terminar, toque nele e escolha "Atualizar". Seus pareceres continuam salvos.');
+  abrirLink(info.url);
 }
 
 function desenharItens(ul, itens) {
@@ -388,12 +426,30 @@ async function salvarFluxo(enviar) {
     p.thumb = await scan.miniatura(final);
     p.w = final.width; p.h = final.height;
     await db.salvar(p);
+    await copiaNoCelular(p);
     aviso(`Salvo na pasta ${nomePasta(p)}`);
     if (enviar) await compartilhar(p);
     irAba('escanear');
   } catch (err) {
     console.error(err); aviso('Erro ao salvar: ' + err.message);
     botoes.forEach(b => b.disabled = false);
+  }
+}
+
+// No app: guarda também um PDF em Documentos/CAMED Scan/ESPECIALIDADE
+async function copiaNoCelular(p) {
+  if (!ehApp()) return;
+  try {
+    let { w, h } = p;
+    if (!w) { const c = await scan.blobParaCanvas(p.img); w = c.width; h = c.height; }
+    const pdf = await jpegParaPdf(p.img, w, h);
+    const antigo = p.arquivo;
+    p.arquivo = await salvarNoCelular(pdf, p);
+    if (antigo && antigo !== p.arquivo) await apagarDoCelular(antigo);
+    await db.salvar(p);
+  } catch (e) {
+    console.error(e);
+    aviso('Salvo no app, mas não consegui criar a cópia na pasta Documentos.');
   }
 }
 
@@ -407,6 +463,11 @@ async function compartilhar(p) {
     let { w, h } = p;
     if (!w) { const c = await scan.blobParaCanvas(p.img); w = c.width; h = c.height; }
     arquivo = new File([await jpegParaPdf(p.img, w, h)], base + '.pdf', { type: 'application/pdf' });
+  }
+  if (ehApp()) {
+    try { await compartilharNoApp(arquivo, arquivo.name, base); }
+    catch (e) { if (!/cancel/i.test(e.message || '')) aviso('Não consegui compartilhar.'); }
+    return;
   }
   if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
     try { await navigator.share({ files: [arquivo], title: base }); }
@@ -454,12 +515,7 @@ async function telaPlanilha() {
   const btn = $('#copiar');
   if (btn) btn.onclick = async () => {
     const tsv = linhas.map(p => linhaPlanilha(p).join('\t')).join('\n');
-    try {
-      await navigator.clipboard.writeText(tsv);
-    } catch {
-      const t = document.createElement('textarea'); t.value = tsv; document.body.appendChild(t); t.select();
-      document.execCommand('copy'); t.remove();
-    }
+    await copiarTexto(tsv);
     aviso(`${linhas.length} linha(s) copiada(s)!`);
     const pend = linhas.filter(p => !p.copiado);
     if (pend.length && confirm(`Marcar ${pend.length} linha(s) como já copiada(s)? Assim elas saem de "Não copiados".`)) {
@@ -537,12 +593,12 @@ async function telaDetalhe(id) {
     </div>`;
   ligarFormulario($('#form'), p);
   $('#copiado').onchange = e => { p.copiado = e.target.checked; };
-  $('#salvar').onclick = async () => { await db.salvar(p); aviso('Alterações salvas'); voltar(); };
+  $('#salvar').onclick = async () => { await db.salvar(p); await copiaNoCelular(p); aviso('Alterações salvas'); voltar(); };
   $('#enviar').onclick = async () => { await db.salvar(p); compartilhar(p); };
-  $('#copiar1').onclick = async () => { await navigator.clipboard.writeText(linhaPlanilha(p).join('\t')); aviso('Linha copiada'); };
+  $('#copiar1').onclick = async () => { await copiarTexto(linhaPlanilha(p).join('\t')); aviso('Linha copiada'); };
   $('#excluir').onclick = async () => {
     if (!confirm(`Excluir o parecer de ${p.paciente}? Não dá para desfazer.`)) return;
-    await db.apagar(p.id); aviso('Excluído'); voltar();
+    await apagarDoCelular(p.arquivo); await db.apagar(p.id); aviso('Excluído'); voltar();
   };
 }
 
@@ -615,7 +671,33 @@ async function telaConfig() {
         <select id="c-limpa"><option value="0">Nunca</option><option value="30">Mais de 30 dias</option><option value="60">Mais de 60 dias</option><option value="90">Mais de 90 dias</option></select></label>
     </div>
     <button class="btn cheio" id="salvar-cfg">Salvar ajustes</button>
-    <p class="suave pequeno" style="text-align:center;margin-top:16px">Parecer Scan · os pareceres ficam só neste celular.</p>`;
+
+    <div class="cartao" style="margin-top:12px">
+      <h2>Atualização</h2>
+      <p class="suave" style="margin-top:0">Versão instalada: <b>${VERSAO}</b>${ehApp() ? '' : ' (site)'}</p>
+      <button class="btn sec cheio" id="ver-att">🔄 Verificar atualização</button>
+      <div id="res-att" class="suave pequeno" style="margin-top:8px"></div>
+      ${ehApp() ? '' : `<p class="pequeno"><a href="${LINK_APK}">Baixar o app Android (.apk)</a></p>`}
+    </div>
+    <p class="suave pequeno" style="text-align:center;margin-top:16px">CAMED Scan · ${ehApp() ? 'cópias em PDF ficam em Documentos/CAMED Scan.' : 'os pareceres ficam só neste celular.'}</p>`;
+  $('#ver-att').onclick = async () => {
+    const r = $('#res-att');
+    r.innerHTML = '<span class="carregando"></span> Verificando…';
+    if (!ehApp()) {
+      try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch {}
+      r.textContent = 'Recarregando a versão mais nova…';
+      setTimeout(() => location.reload(), 600);
+      return;
+    }
+    try {
+      const info = await checarAtualizacao(true);
+      ultimaBusca = info;
+      if (info.tem) {
+        r.innerHTML = `Nova versão <b>${esc(info.versao)}</b> disponível. <button class="btn verde cheio" style="margin-top:8px" id="baixar-att2">⬇️ Baixar e instalar</button>`;
+        $('#baixar-att2').onclick = () => instalarAtualizacao(info);
+      } else r.textContent = '✓ Você já está na versão mais recente.';
+    } catch (e) { r.textContent = '✗ ' + e.message; }
+  };
 
   $('#c-modo').value = cfg.modoLeitura;
   $('#c-modelo').value = cfg.modeloPlanilha;
@@ -663,13 +745,15 @@ async function limpezaAutomatica() {
   if (!cfg.limpezaDias) return;
   const n = await db.contarAntigos(cfg.limpezaDias);
   if (n && confirm(`Apagar ${n} parecer(es) com mais de ${cfg.limpezaDias} dias para liberar espaço?`)) {
+    const limite = Date.now() - cfg.limpezaDias * 86400000;
+    for (const p of (await db.listar()).filter(x => x.criadoEm < limite)) await apagarDoCelular(p.arquivo);
     await db.limparAntigos(cfg.limpezaDias);
     aviso(`${n} parecer(es) antigos apagados`);
   }
 }
 
 // ================= Início =================
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !ehApp()) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 navigator.storage?.persist?.();

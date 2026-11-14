@@ -1,0 +1,12 @@
+{
+  "appId": "br.com.camed.scan",
+  "appName": "CAMED Scan",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#12307a"
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 0 }
+  }
+}
