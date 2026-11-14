@@ -21,23 +21,32 @@ export function recorteParaIA(canvas, soTopo) {
 }
 
 export async function escolherModelo(chave) {
+  return (await modelosDisponiveis(chave))[0];
+}
+
+// Modelos em ordem de preferência: Flash-Lite (rápido) primeiro, depois Flash.
+export async function modelosDisponiveis(chave) {
   const r = await fetch(`${API}/models?pageSize=200`, { headers: { 'x-goog-api-key': chave } });
   if (!r.ok) throw new Error(await mensagemErro(r));
   const { models = [] } = await r.json();
   const nomes = models
     .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map(m => m.name.replace('models/', ''));
-  // Flash-Lite: o mais rápido para ler o cabeçalho (sem "pensar" demais)
-  if (nomes.includes('gemini-flash-lite-latest')) return 'gemini-flash-lite-latest';
   const versao = n => parseFloat(n.split('-')[1]) || 0;
-  const lite = nomes.filter(n => /^gemini-\d+(\.\d+)?-flash-lite$/.test(n)).sort((a, b) => versao(b) - versao(a));
-  if (lite.length) return lite[0];
-  if (nomes.includes('gemini-flash-latest')) return 'gemini-flash-latest';
-  const estaveis = nomes.filter(n => /^gemini-\d+(\.\d+)?-flash$/.test(n)).sort((a, b) => versao(b) - versao(a));
-  if (estaveis.length) return estaveis[0];
-  const qualquer = nomes.find(n => n.includes('flash') && !/(image|tts|audio|live|embed)/.test(n));
-  if (qualquer) return qualquer;
-  throw new Error('Nenhum modelo Gemini disponível para esta chave.');
+  const porVersao = re => nomes.filter(n => re.test(n)).sort((a, b) => versao(b) - versao(a));
+  const ordem = [
+    ...nomes.filter(n => n === 'gemini-flash-lite-latest'),
+    ...porVersao(/^gemini-\d+(\.\d+)?-flash-lite$/),
+    ...nomes.filter(n => n === 'gemini-flash-latest'),
+    ...porVersao(/^gemini-\d+(\.\d+)?-flash$/),
+  ];
+  const lista = [...new Set(ordem)];
+  if (!lista.length) {
+    const qualquer = nomes.find(n => n.includes('flash') && !/(image|tts|audio|live|embed)/.test(n));
+    if (qualquer) lista.push(qualquer);
+  }
+  if (!lista.length) throw new Error('Nenhum modelo Gemini disponível para esta chave.');
+  return lista.slice(0, 5);
 }
 
 async function mensagemErro(r) {
@@ -46,6 +55,7 @@ async function mensagemErro(r) {
     const m = j.error?.message || '';
     if (r.status === 400 && /API key/i.test(m)) return 'Chave do Gemini inválida. Confira em Configurações.';
     if (r.status === 429) return 'Limite de uso do Gemini atingido. Tente de novo em instantes.';
+    if (r.status === 503 || /high demand|overloaded|unavailable/i.test(m)) return 'O Gemini está sobrecarregado agora. Toque em "Ler de novo" daqui a pouco ou preencha à mão.';
     return `Gemini: ${m || r.status}`;
   } catch { return `Gemini: erro ${r.status}`; }
 }
@@ -64,10 +74,44 @@ const ESQUEMA = {
   required: ['de_cabeca_para_baixo', 'paciente', 'especialidade_lida', 'especialidade', 'setor_lido', 'bloco', 'leito'],
 };
 
-export async function lerComGemini(canvas, cfg) {
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+const sobrecarga = e => [429, 500, 503, 504].includes(e.status);
+
+// Tenta o modelo salvo; se o Google estiver sobrecarregado, espera e tenta de novo,
+// depois passa para os outros modelos disponíveis.
+export async function lerComGemini(canvas, cfg, aoTentar) {
   if (!cfg.chave) throw new Error('Coloque a chave do Gemini em Configurações.');
-  let modelo = cfg.modelo;
-  if (!modelo) modelo = await escolherModelo(cfg.chave);
+  let candidatos = cfg.modelo ? [cfg.modelo] : [];
+  let listaCarregada = false;
+  let ultimoErro;
+  for (let i = 0; i < 6; i++) {
+    if (!candidatos.length) {
+      if (listaCarregada) break;
+      candidatos = await modelosDisponiveis(cfg.chave);
+      listaCarregada = true;
+      if (cfg.modelo) candidatos = candidatos.filter(m => m !== cfg.modelo);
+      if (!candidatos.length) break;
+    }
+    const modelo = candidatos[0];
+    try {
+      return await lerUmaVez(canvas, cfg, modelo);
+    } catch (e) {
+      ultimoErro = e;
+      if (e.status === 404) { candidatos.shift(); continue; }       // modelo saiu do ar
+      if (!sobrecarga(e)) throw e;
+      if (!e.repetido) {                                           // 1ª falha: espera e repete
+        e.repetido = true; aoTentar?.(`Gemini ocupado, tentando de novo…`);
+        await esperar(1500);
+        try { return await lerUmaVez(canvas, cfg, modelo); } catch (e2) { ultimoErro = e2; if (!sobrecarga(e2)) throw e2; }
+      }
+      candidatos.shift();
+      aoTentar?.('Gemini ocupado, tentando outro modelo…');
+    }
+  }
+  throw ultimoErro || new Error('Não consegui ler agora.');
+}
+
+async function lerUmaVez(canvas, cfg, modelo) {
 
   const img = recorteParaIA(canvas, cfg.soTopo);
   const b64 = await blobBase64(await paraBlob(img, 0.8));
@@ -106,11 +150,7 @@ ${cfg.blocos.join('\n')}`;
     const txt = await r.clone().text();
     if (/thinking/i.test(txt)) { delete corpo.generationConfig.thinkingConfig; r = await enviar(); }
   }
-  if (r.status === 404 && cfg.modelo) {
-    // modelo salvo saiu do ar: escolhe outro e tenta de novo
-    return lerComGemini(canvas, { ...cfg, modelo: '' });
-  }
-  if (!r.ok) throw new Error(await mensagemErro(r));
+  if (!r.ok) { const e = new Error(await mensagemErro(r)); e.status = r.status; throw e; }
   const j = await r.json();
   const txt = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '{}';
   const dados = JSON.parse(txt);

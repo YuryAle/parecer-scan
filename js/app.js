@@ -385,7 +385,9 @@ async function lerDados() {
   const inicio = performance.now();
   try {
     const canvas = fluxo.final || montarFinal();
-    const r = cfg.modoLeitura === 'gemini' ? await lerComGemini(canvas, cfg) : await lerNoCelular(canvas);
+    const r = cfg.modoLeitura === 'gemini'
+      ? await lerComGemini(canvas, cfg, msg => statusIA(['', `<span class="carregando"></span> ${esc(msg)}`]))
+      : await lerNoCelular(canvas);
     if (r._modelo && r._modelo !== cfg.modelo) { cfg.modelo = r._modelo; salvarCfg(); }
     if (r.de_cabeca_para_baixo && !fluxo.tentouVirar) {
       fluxo.tentouVirar = true;

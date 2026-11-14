@@ -266,7 +266,7 @@ export function aplicarFiltro(canvas, modo = 'nitido') {
     if (modo === 'nitido') {
       const l = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
       let v = l / bg;               // 1 = papel, menor = tinta
-      v = (v - 0.5) / (0.9 - 0.5);   // estica o contraste
+      v = (v - 0.45) / (0.82 - 0.45); // estica o contraste (manchas claras viram branco)
       v = v < 0 ? 0 : v > 1 ? 1 : v;
       v = Math.pow(v, 1.35);         // escurece o texto
       const g = v * 255;
