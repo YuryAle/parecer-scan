@@ -73,7 +73,7 @@ export async function lerComGemini(canvas, cfg) {
 Extraia os dados do cabeçalho. Responda só com o JSON pedido.
 - paciente: campo NOME.
 - especialidade_lida: campo PARA (especialidade ou exame pedido).
-- especialidade: escolha da LISTA DE ESPECIALIDADES a opção equivalente ao campo PARA e copie o texto exatamente como está na lista. Exemplo: "Doppler transcraniano" corresponde a uma opção de ultrassonografia com doppler. Se nada servir, deixe vazio.
+- especialidade: escolha da LISTA DE ESPECIALIDADES a opção equivalente ao campo PARA e copie o texto exatamente como está na lista. Exemplos: "Neuro" = NEUROLOGIA; "Risco cirúrgico" = CARDIOLOGIA RISCO; "Ortopedia" = ORTOPEDIA E TRAUMATOLOGIA. Se nada servir, deixe vazio.
 - setor_lido: campo DE, SETOR ou o texto ao lado de LEITO (ex: "UTI 3", "SUTURA", "BLOCO B").
 - bloco: escolha da LISTA DE BLOCOS a opção equivalente ao setor e copie exatamente. Se nada servir, deixe vazio.
 - leito: número do LEITO ou BOX.

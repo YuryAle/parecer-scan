@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as scan from './scan.js';
 import { lerComGemini, lerNoCelular, escolherModelo } from './ai.js';
 import { jpegParaPdf } from './pdf.js';
-import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, melhorOpcao, normalizar, textoParaLista } from './lists.js';
+import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, melhorOpcao, normalizar, textoParaLista } from './lists.js';
 
 // ================= Configurações =================
 const PADRAO = {
@@ -21,6 +21,12 @@ const PADRAO = {
 };
 let cfg = { ...PADRAO, ...JSON.parse(localStorage.getItem('cfg') || '{}') };
 const salvarCfg = () => localStorage.setItem('cfg', JSON.stringify(cfg));
+if ((cfg.versaoListas || 1) < VERSAO_LISTAS) {
+  // listas padrão novas (vindas da planilha) substituem as antigas
+  cfg.especialidades = ESPECIALIDADES_PADRAO;
+  cfg.versaoListas = VERSAO_LISTAS;
+  salvarCfg();
+}
 
 // ================= Utilidades =================
 const $ = s => document.querySelector(s);
