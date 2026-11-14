@@ -5,25 +5,25 @@ export const ESPECIALIDADES_PADRAO = [
   'ARRITMOLOGIA',
   'BUCOMAXILOFACIAL',
   'BRONCOSCOPIA',
-  'CARDIOLOGIA  PARECER',
+  'CARDIOLOGIA PARECER',
   'CARDIOLOGIA RISCO',
   'CIRURGIA CARDIOVASCULAR',
   'CIRURGIA DE CABEÇA E PESCOÇO',
   'CIRURGIA GERAL',
-  'CIRURGIA TÓRACICA',
+  'CIRURGIA TORÁCICA',
   'CIRURGIA VASCULAR',
   'CIRURGIA ONCOLÓGICA',
   'CIRURGIA PLÁSTICA',
   'CLÍNICA MÉDICA',
   'COLOPROCTOLOGIA',
-  'CUIDADOS PALIATIVOS NÃO ONCOLOGICOS',
+  'CUIDADOS PALIATIVOS NÃO ONCOLÓGICOS',
   'DERMATOLOGIA',
   'DOPPLER TRANSCRANIANO',
   'DOR',
   'ENDOCRINOLOGIA',
   'ENDOSCOPIA',
   'GASTROENTEROLOGIA',
-  'GINECOLOGIA E OBSTERÍCIA',
+  'GINECOLOGIA E OBSTETRÍCIA',
   'ORTOPEDIA E TRAUMATOLOGIA',
   'HEMATOLOGIA',
   'INFECTOLOGIA',
@@ -55,7 +55,7 @@ export const BLOCOS_PADRAO = [
 ];
 
 // Aumente quando as listas padrão mudarem: substitui as listas antigas salvas no celular.
-export const VERSAO_LISTAS = 2;
+export const VERSAO_LISTAS = 3;
 
 export const HOSPITAIS_PADRAO = ['HGR'];
 
@@ -139,4 +139,14 @@ export function textoParaLista(txt) {
   return String(txt || '').split(/\r?\n|\t/)
     .map(l => l.trim())
     .filter(l => l && !vistos.has(l) && vistos.add(l));
+}
+
+// Cardiologia tem duas opções na planilha: risco cirúrgico e parecer comum.
+export function regraCardiologia(lido, escolhida, opcoes) {
+  const n = normalizar(`${lido || ''} ${escolhida || ''}`);
+  if (!/CARDIO/.test(n) || /CIRURGIA CARDIO|ARRITMO/.test(normalizar(lido))) return escolhida;
+  const risco = opcoes.find(o => /^CARDIOLOGIA RISCO/.test(normalizar(o)));
+  const parecer = opcoes.find(o => /^CARDIOLOGIA PARECER/.test(normalizar(o)));
+  if (/RISCO|PRE ?OPERATORIO|PREOP|CIRURGIC/.test(normalizar(lido))) return risco || escolhida;
+  return parecer || escolhida;
 }

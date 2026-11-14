@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as scan from './scan.js';
 import { lerComGemini, lerNoCelular, escolherModelo } from './ai.js';
 import { jpegParaPdf } from './pdf.js';
-import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, melhorOpcao, normalizar, textoParaLista } from './lists.js';
+import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, melhorOpcao, normalizar, textoParaLista, regraCardiologia } from './lists.js';
 
 // ================= Configurações =================
 const PADRAO = {
@@ -342,12 +342,13 @@ async function lerDados() {
 
 function aplicarLeitura(r) {
   const p = fluxo.dados;
-  const esp = melhorOpcao(r.especialidade, cfg.especialidades, 0.8) || melhorOpcao(r.especialidade_lida, cfg.especialidades)
+  const esp = melhorOpcao(r.especialidade_lida, cfg.especialidades, 0.99) || melhorOpcao(r.especialidade, cfg.especialidades, 0.8) || melhorOpcao(r.especialidade_lida, cfg.especialidades)
     || (r.especialidade_lida || '').toUpperCase().trim();
+  const espFinal = regraCardiologia(r.especialidade_lida, esp, cfg.especialidades);
   const bloco = melhorOpcao(r.bloco, cfg.blocos, 0.8) || melhorOpcao(r.setor_lido, cfg.blocos, 0.6) || '';
   const novos = {
     paciente: (r.paciente || '').toUpperCase().replace(/\s+/g, ' ').trim(),
-    especialidade: esp,
+    especialidade: espFinal,
     bloco,
     leito: (r.leito || '').trim(),
   };
