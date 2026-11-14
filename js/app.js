@@ -118,7 +118,8 @@ async function telaInicio() {
     <div id="banner-atualizacao"></div>
     <button class="btn grande cheio" id="tirar">📷 Tirar foto do parecer</button>
     <div class="linha-btns" style="margin:10px 0 16px">
-      <button class="btn sec" id="da-galeria">🖼️ Escolher da galeria</button>
+      <button class="btn sec" id="lote">📚 Várias de uma vez</button>
+      <button class="btn sec" id="da-galeria">🖼️ Galeria</button>
     </div>
     <div class="cartao">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -129,6 +130,8 @@ async function telaInicio() {
     <ul class="lista" id="recentes"></ul>`;
   $('#tirar').onclick = () => $('#camera').click();
   $('#da-galeria').onclick = () => $('#galeria').click();
+  $('#lote').onclick = () => abrir(telaLote);
+  if (lote.length) $('#lote').textContent = `📚 Continuar lote (${lote.length})`;
   tela.querySelector('[data-ir]')?.addEventListener('click', () => irAba('config'));
   desenharItens($('#recentes'), deHoje.slice(0, 15));
   mostrarBannerAtualizacao();
@@ -183,7 +186,7 @@ function desenharItens(ul, itens) {
 }
 
 // ---------- Fluxo da foto ----------
-const fluxo = {};
+let fluxo = {};
 
 for (const id of ['#camera', '#galeria']) {
   $(id).addEventListener('change', async e => {
@@ -191,6 +194,7 @@ for (const id of ['#camera', '#galeria']) {
     e.target.value = '';
     if (!f) return;
     tela.innerHTML = '<div class="vazio-grande"><div><span class="carregando"></span></div>Abrindo foto…</div>';
+    fluxo = {};
     try {
       fluxo.fonte = await scan.carregarImagem(f);
       fluxo.cantos = scan.detectarCantos(fluxo.fonte);
@@ -259,8 +263,7 @@ function telaRecorte() {
   };
 }
 
-function novoRegistro() {
-  const d = fluxo.horaFoto || new Date();
+function novoRegistro(d = fluxo.horaFoto || new Date()) {
   return {
     id: 'p' + d.getTime() + Math.random().toString(36).slice(2, 6),
     criadoEm: d.getTime(),
@@ -385,10 +388,7 @@ async function lerDados() {
   const inicio = performance.now();
   try {
     const canvas = fluxo.final || montarFinal();
-    const r = cfg.modoLeitura === 'gemini'
-      ? await lerComGemini(canvas, cfg, msg => statusIA(['', `<span class="carregando"></span> ${esc(msg)}`]))
-      : await lerNoCelular(canvas);
-    if (r._modelo && r._modelo !== cfg.modelo) { cfg.modelo = r._modelo; salvarCfg(); }
+    const r = await lerParecer(canvas, msg => statusIA(['', `<span class="carregando"></span> ${esc(msg)}`]));
     if (r.de_cabeca_para_baixo && !fluxo.tentouVirar) {
       fluxo.tentouVirar = true;
       fluxo.rotacao = (fluxo.rotacao + 180) % 360;
@@ -404,8 +404,24 @@ async function lerDados() {
   }
 }
 
-function aplicarLeitura(r) {
-  const p = fluxo.dados;
+// Lê com a IA escolhida. Se a especialidade não vier lendo só o topo,
+// tenta mais uma vez com a página inteira.
+async function lerParecer(canvas, aoStatus) {
+  if (cfg.modoLeitura !== 'gemini') return lerNoCelular(canvas);
+  const r = await lerComGemini(canvas, cfg, aoStatus);
+  if (r._modelo && r._modelo !== cfg.modelo) { cfg.modelo = r._modelo; salvarCfg(); }
+  if (cfg.soTopo && !r.de_cabeca_para_baixo && !(r.especialidade_lida || '').trim()) {
+    aoStatus?.('Procurando a especialidade na página inteira…');
+    try {
+      const r2 = await lerComGemini(canvas, { ...cfg, soTopo: false }, aoStatus);
+      for (const [k, v] of Object.entries(r2)) if (v && !String(r[k] ?? '').trim()) r[k] = v;
+    } catch (e) { console.warn(e); }
+  }
+  return r;
+}
+
+function aplicarLeitura(r, alvo = fluxo) {
+  const p = alvo.dados;
   const esp = melhorOpcao(r.especialidade_lida, cfg.especialidades, 0.99) || melhorOpcao(r.especialidade, cfg.especialidades, 0.8) || melhorOpcao(r.especialidade_lida, cfg.especialidades)
     || (r.especialidade_lida || '').toUpperCase().trim();
   const espFinal = regraCardiologia(r.especialidade_lida, esp, cfg.especialidades);
@@ -416,8 +432,8 @@ function aplicarLeitura(r) {
     bloco,
     leito: (r.leito || '').trim(),
   };
-  for (const [k, v] of Object.entries(novos)) if (!fluxo.tocados.has(k) && v) p[k] = v;
-  fluxo.atualizarForm?.();
+  for (const [k, v] of Object.entries(novos)) if (!alvo.tocados.has(k) && v) p[k] = v;
+  if (alvo === fluxo) fluxo.atualizarForm?.();
 }
 
 async function salvarFluxo(enviar) {
@@ -434,6 +450,7 @@ async function salvarFluxo(enviar) {
     await copiaNoCelular(p);
     aviso(`Salvo na pasta ${nomePasta(p)}`);
     if (enviar) await compartilhar(p);
+    if (fluxo.doLote) { tirarDoLote(fluxo); voltar(); return; }
     irAba('escanear');
   } catch (err) {
     console.error(err); aviso('Erro ao salvar: ' + err.message);
@@ -483,6 +500,135 @@ async function compartilhar(p) {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     aviso('Arquivo baixado. Envie pelo WhatsApp.');
   }
+}
+
+// ================= Lote: várias fotos de uma vez =================
+// Cada foto é recortada sozinha e lida pela IA em fila. Depois é só conferir e salvar.
+const lote = [];
+let filaRodando = false;
+
+function telaLote() {
+  titulo(`Lote (${lote.length})`, true);
+  const prontos = lote.filter(i => i.estado === 'ok' && i.dados.paciente).length;
+  tela.innerHTML = `
+    <div class="linha-btns">
+      <button class="btn" id="l-cam">📷 Tirar foto</button>
+      <button class="btn sec" id="l-gal">🖼️ Galeria (várias)</button>
+    </div>
+    <p class="suave pequeno">Tire uma foto atrás da outra. O app recorta e lê cada uma sozinho. Toque num parecer para conferir ou corrigir.</p>
+    <ul class="lista" id="l-itens"></ul>
+    ${lote.length ? `<button class="btn verde cheio" id="l-salvar" ${prontos ? '' : 'disabled'}>💾 Salvar ${prontos} pronto(s)</button>
+      <button class="btn perigo cheio" style="margin-top:8px" id="l-limpar">Descartar lote</button>` : '<div class="vazio-grande"><div>📚</div>Nenhuma foto ainda.</div>'}`;
+  $('#l-cam').onclick = () => $('#camera-lote').click();
+  $('#l-gal').onclick = () => $('#galeria-lote').click();
+  const ul = $('#l-itens');
+  ul.innerHTML = lote.map((it, n) => {
+    const p = it.dados;
+    const st = { fila: '⏳ na fila', lendo: '<span class="carregando"></span> lendo…', ok: p.paciente ? '✓ lido' : '⚠ sem nome', erro: '⚠ ' + esc(it.msg || 'erro') }[it.estado];
+    return `<li class="item" data-i="${n}">
+      <img src="${it.thumbUrl || ''}" alt="">
+      <div class="info"><b>${esc(p.paciente || 'Parecer ' + (n + 1))}</b>
+        <div class="suave pequeno">${esc(p.especialidade || '—')} · ${esc(p.bloco || '')} ${p.leito ? 'Leito ' + esc(p.leito) : ''}</div>
+        <div class="pequeno">${st}</div></div></li>`;
+  }).join('');
+  ul.querySelectorAll('[data-i]').forEach(li => li.onclick = () => abrirItemLote(lote[+li.dataset.i]));
+  $('#l-salvar')?.addEventListener('click', salvarLote);
+  $('#l-limpar')?.addEventListener('click', () => {
+    if (!confirm('Descartar todas as fotos do lote que ainda não foram salvas?')) return;
+    lote.forEach(i => i.thumbUrl && URL.revokeObjectURL(i.thumbUrl));
+    lote.length = 0; telaLote();
+  });
+}
+
+const naTelaLote = () => $('#titulo').textContent.startsWith('Lote');
+const redesenharLote = () => { if (naTelaLote()) telaLote(); };
+
+for (const id of ['#camera-lote', '#galeria-lote']) {
+  $(id).addEventListener('change', async e => {
+    const arquivos = [...e.target.files];
+    e.target.value = '';
+    for (const f of arquivos) {
+      try { await adicionarAoLote(f); } catch (err) { console.error(err); aviso('Não consegui abrir uma das fotos.'); }
+      redesenharLote();
+    }
+    rodarFila();
+  });
+}
+
+async function adicionarAoLote(arquivo) {
+  const hora = new Date(arquivo.lastModified && Date.now() - arquivo.lastModified < 86400e3 ? arquivo.lastModified : Date.now());
+  const fonte = await scan.carregarImagem(arquivo);
+  const rec = scan.recortar(fonte, scan.detectarCantos(fonte));
+  const nitido = scan.aplicarFiltro(rec, 'nitido');
+  const rotacao = scan.textoEstaDeitado(nitido) ? 90 : 0;
+  const thumb = await scan.miniatura(scan.girar(nitido, rotacao));
+  lote.push({
+    doLote: true, recBlob: await scan.paraBlob(rec, 0.88), filtro: 'nitido', rotacao,
+    horaFoto: hora, dados: novoRegistro(hora), tocados: new Set(), estado: 'fila',
+    thumbUrl: URL.createObjectURL(thumb),
+  });
+}
+
+async function canvasFinalDe(it) {
+  if (!it.recortado) it.recortado = await scan.blobParaCanvas(it.recBlob);
+  return scan.girar(scan.aplicarFiltro(it.recortado, it.filtro), it.rotacao);
+}
+
+async function rodarFila() {
+  if (filaRodando) return;
+  filaRodando = true;
+  try {
+    let it;
+    while ((it = lote.find(i => i.estado === 'fila'))) {
+      if (cfg.modoLeitura === 'manual' || (cfg.modoLeitura === 'gemini' && !cfg.chave)) { it.estado = 'ok'; continue; }
+      it.estado = 'lendo'; redesenharLote();
+      try {
+        let r = await lerParecer(await canvasFinalDe(it));
+        if (r.de_cabeca_para_baixo) {
+          it.rotacao = (it.rotacao + 180) % 360;
+          r = await lerParecer(await canvasFinalDe(it));
+          URL.revokeObjectURL(it.thumbUrl);
+          it.thumbUrl = URL.createObjectURL(await scan.miniatura(await canvasFinalDe(it)));
+        }
+        aplicarLeitura(r, it);
+        it.estado = 'ok'; it.statusIA = ['ok', '✓ Dados lidos. Confira antes de salvar.'];
+      } catch (err) {
+        it.estado = 'erro'; it.msg = err.message; it.statusIA = ['erro', esc(err.message) + ' Preencha à mão se precisar.'];
+      }
+      if (fluxo === it) statusIA(it.statusIA); else it.recortado = null; // libera memória
+      redesenharLote();
+    }
+  } finally { filaRodando = false; }
+}
+
+async function abrirItemLote(it) {
+  it.recortado = await scan.blobParaCanvas(it.recBlob);
+  fluxo = it;
+  if (it.estado === 'lendo' || it.estado === 'fila') it.statusIA = ['', 'Ainda lendo este parecer… você já pode preencher.'];
+  abrir(telaRevisao);
+}
+
+function tirarDoLote(it) {
+  const n = lote.indexOf(it);
+  if (n >= 0) { lote.splice(n, 1); URL.revokeObjectURL(it.thumbUrl); }
+}
+
+async function salvarLote() {
+  const prontos = lote.filter(i => i.estado === 'ok' && i.dados.paciente);
+  const btn = $('#l-salvar'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="carregando"></span> Salvando…'; }
+  let n = 0;
+  for (const it of prontos) {
+    try {
+      const final = await canvasFinalDe(it);
+      const p = it.dados;
+      p.img = await scan.paraBlob(final); p.thumb = await scan.miniatura(final);
+      p.w = final.width; p.h = final.height;
+      await db.salvar(p); await copiaNoCelular(p);
+      it.recortado = null; tirarDoLote(it); n++;
+    } catch (e) { console.error(e); }
+  }
+  aviso(`${n} parecer(es) salvos nas pastas.` + (lote.length ? ` ${lote.length} ainda precisam de conferência.` : ''));
+  if (lote.length) telaLote(); else voltar();
 }
 
 // ================= Planilha =================
@@ -766,4 +912,4 @@ irAba('escanear');
 setTimeout(limpezaAutomatica, 1500);
 
 // para testes
-window.__app = { fluxo, cfg, scan, db, aplicarLeitura, linhaPlanilha };
+window.__app = { get fluxo() { return fluxo; }, get lote() { return lote; }, cfg, scan, db, aplicarLeitura, linhaPlanilha };

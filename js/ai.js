@@ -12,7 +12,7 @@ async function blobBase64(blob) {
 
 // Parte que vai para a IA: só o topo do parecer (cabeçalho), quando ativado.
 export function recorteParaIA(canvas, soTopo) {
-  const fracao = soTopo ? 0.37 : 1;
+  const fracao = soTopo ? 0.5 : 1;
   const sh = Math.round(canvas.height * fracao);
   const k = Math.min(1, 1200 / canvas.width);
   const c = novoCanvas(canvas.width * k, sh * k);
@@ -116,10 +116,10 @@ async function lerUmaVez(canvas, cfg, modelo) {
   const img = recorteParaIA(canvas, cfg.soTopo);
   const b64 = await blobBase64(await paraBlob(img, 0.8));
   const prompt =
-`Esta é a parte de cima de um PEDIDO DE PARECER médico de um hospital (Hospital Geral de Roraima).
+`Esta é a imagem (ou a parte de cima) de um PEDIDO DE PARECER médico de um hospital (Hospital Geral de Roraima).
 Extraia os dados do cabeçalho. Responda só com o JSON pedido.
 - paciente: campo NOME.
-- especialidade_lida: campo PARA (especialidade ou exame pedido).
+- especialidade_lida: campo PARA (especialidade ou exame pedido). Pode estar num quadro "PARA:" ao lado de "DE:" e "BOX", no cabeçalho, ou na frase "solicito parecer da/de ...". Se houver qualquer especialidade ou exame escrito, nunca deixe vazio.
 - especialidade: escolha da LISTA DE ESPECIALIDADES a opção equivalente ao campo PARA e copie o texto exatamente como está na lista. Exemplos: "Neuro" = NEUROLOGIA; Cardiologia tem duas opções: se o pedido fala em risco cirúrgico ou pré-operatório use CARDIOLOGIA RISCO, senão use CARDIOLOGIA PARECER; "Ortopedia" = ORTOPEDIA E TRAUMATOLOGIA. Se nada servir, deixe vazio.
 - setor_lido: campo DE, SETOR ou o texto ao lado de LEITO (ex: "UTI 3", "SUTURA", "BLOCO B").
 - bloco: escolha da LISTA DE BLOCOS a opção equivalente ao setor e copie exatamente. Se nada servir, deixe vazio.
