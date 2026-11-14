@@ -1,5 +1,5 @@
 // Guarda o app no celular para abrir rápido e funcionar sem internet.
-const VERSAO = 'parecer-scan-v3';
+const VERSAO = 'parecer-scan-v4';
 const ARQUIVOS = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/db.js', 'js/scan.js', 'js/ai.js', 'js/pdf.js', 'js/lists.js',

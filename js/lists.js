@@ -3,17 +3,17 @@
 
 export const ESPECIALIDADES_PADRAO = [
   'ARRITMOLOGIA',
-  'BUCOMAXILOFACIAL',
   'BRONCOSCOPIA',
+  'BUCOMAXILOFACIAL',
   'CARDIOLOGIA PARECER',
   'CARDIOLOGIA RISCO',
   'CIRURGIA CARDIOVASCULAR',
   'CIRURGIA DE CABEÇA E PESCOÇO',
   'CIRURGIA GERAL',
-  'CIRURGIA TORÁCICA',
-  'CIRURGIA VASCULAR',
   'CIRURGIA ONCOLÓGICA',
   'CIRURGIA PLÁSTICA',
+  'CIRURGIA TORÁCICA',
+  'CIRURGIA VASCULAR',
   'CLÍNICA MÉDICA',
   'COLOPROCTOLOGIA',
   'CUIDADOS PALIATIVOS NÃO ONCOLÓGICOS',
@@ -24,40 +24,288 @@ export const ESPECIALIDADES_PADRAO = [
   'ENDOSCOPIA',
   'GASTROENTEROLOGIA',
   'GINECOLOGIA E OBSTETRÍCIA',
-  'ORTOPEDIA E TRAUMATOLOGIA',
   'HEMATOLOGIA',
   'INFECTOLOGIA',
   'NEFROLOGIA',
   'NEUROCIRURGIA',
   'NEUROLOGIA',
+  'NUTROLOGIA',
+  'ODONTOLOGIA',
   'OFTALMOLOGIA',
   'ONCOLOGIA CLÍNICA',
+  'ORTOPEDIA E TRAUMATOLOGIA',
   'OTORRINOLARINGOLOGIA',
   'PNEUMOLOGIA',
   'PSIQUIATRIA',
   'RADIOLOGIA',
   'RADIOTERAPIA',
   'REUMATOLOGIA',
+  'SCIH/CCIH',
   'TRATAMENTO DE FERIDAS',
-  'UROLOGIA',
   'ULTRASSONOGRAFIA',
   'ULTRASSONOGRAFIA DOPPLER',
+  'UROLOGIA',
 ];
 
 export const BLOCOS_PADRAO = [
-  'HGR - BLOCO B - BLB',
-  'HGR - BLOCO C1',
-  'HGR - BLOCO E - BLE',
-  'HGR - BLOCO F - BLF',
-  'HGR - UTI 3A',
-  'HGR - UTI 3B',
   'PSAR - OBSERVAÇÃO',
+  'PSAR - VERDE',
+  'PSAR - RCP',
+  'PSFE - SUTURA',
+  'PSFE - RCP',
+  'PSFE - UAVC',
+  'PSFE - VERMELHA 1',
+  'PSFE - VERMELHA 2',
+  'UTI 1A',
+  'UTI 1B',
+  'UTI 2A',
+  'UTI 2B',
+  'UTI 3',
+  'UTI 3A',
+  'UTI 3B',
+  'UTI 3C',
+  'UTI CARDIO - UCO',
+  'BLOCO A - BLA',
+  'BLOCO B - BLB',
+  'BLOCO C1 - BLC1',
+  'BLOCO C2 - BLC2',
+  'BLOCO D - BLD',
+  'BLOCO E - BLE',
+  'BLOCO F - BLF',
 ];
 
 // Aumente quando as listas padrão mudarem: substitui as listas antigas salvas no celular.
-export const VERSAO_LISTAS = 3;
+export const VERSAO_LISTAS = 4;
 
 export const HOSPITAIS_PADRAO = ['HGR'];
+
+// Médicos de cada especialidade (aba Cadastro da planilha), para sugerir no campo MÉDICO.
+export const MEDICOS_PADRAO = {
+  "ARRITMOLOGIA": [
+    "BRUNO ROCHA",
+    "KIM FONG"
+  ],
+  "BUCOMAXILOFACIAL": [
+    "DANIEL",
+    "DENNIS",
+    "JULIENE",
+    "BRUNO",
+    "MARCOS",
+    "LEANDRO",
+    "RICARDO",
+    "RODRIGO",
+    "SILVANA",
+    "HELEN ALICE"
+  ],
+  "BRONCOSCOPIA": [
+    "AMON RHEINGANTZ",
+    "JUCINEIDE",
+    "TAO MACHADO"
+  ],
+  "CARDIOLOGIA PARECER": [
+    "ANA CAROLINA",
+    "BRUNO ROCHA",
+    "ILDEMBERG OLIVEIRA",
+    "LEONARDO L.",
+    "RICARDO OLIVEIRA",
+    "FELIPE MONTEIRO",
+    "WAGNER LEÃO"
+  ],
+  "CARDIOLOGIA RISCO": [
+    "ANA CAROLINA",
+    "BRUNO ROCHA",
+    "ILDEMBERG OLIVEIRA",
+    "LEONARDO L.",
+    "RICARDO OLIVEIRA",
+    "FELIPE MONTEIRO",
+    "WAGNER LEÃO"
+  ],
+  "CIRURGIA CARDIOVASCULAR": [
+    "PAULA LAGO",
+    "TALITA SPOSITO"
+  ],
+  "CIRURGIA DE CABEÇA E PESCOÇO": [
+    "RUITER",
+    "JOSINALDO",
+    "FERNANDO"
+  ],
+  "CIRURGIA GERAL": [
+    "ALEX BLANCO",
+    "ARNALDO JAVIER",
+    "ALTAMIR LAGO",
+    "ANTONIO DELMIRO",
+    "BRUNO GONDIM",
+    "CAMILLA LAGO",
+    "EDER",
+    "HELDER GROSSI",
+    "GLÁUCIO PIRES",
+    "LUIZ FERNANDO",
+    "RAQUEL GOVEA",
+    "RULIAM VIANA",
+    "TAMAN RENERYS",
+    "PAULO VIEGAS",
+    "VIKTOR DIAS"
+  ],
+  "CIRURGIA TORÁCICA": [
+    "ADELIE GAL",
+    "TAO MACHADO"
+  ],
+  "CIRURGIA VASCULAR": [
+    "CAMILA FERREIRA",
+    "SERGIO SOARES",
+    "THIAGO VIEIRA",
+    "GUILHERME A.",
+    "BRUNO MIANA",
+    "RENATO DA SILVA"
+  ],
+  "CIRURGIA ONCOLÓGICA": [
+    "GRUPO"
+  ],
+  "CIRURGIA PLÁSTICA": [
+    "MARCIO ARCOVERDE"
+  ],
+  "CLÍNICA MÉDICA": [
+    "AUXILIADORA",
+    "RENATO",
+    "CAMILA FLORA",
+    "CARLOS PATRICK"
+  ],
+  "COLOPROCTOLOGIA": [],
+  "CUIDADOS PALIATIVOS NÃO ONCOLÓGICOS": [
+    "ANA CASSIA",
+    "TALITA SPOSITO",
+    "BRUNA LEITE",
+    "LEIDIANA NOBLES"
+  ],
+  "DERMATOLOGIA": [
+    "DAYSE HELEN",
+    "JULLYENE GOMES"
+  ],
+  "DOPPLER TRANSCRANIANO": [
+    "ALCIMAR LAVAREDA",
+    "DEIVIS BRITO",
+    "JOSELITO SANTOS",
+    "ROGER",
+    "THIAGO PENAFORTE"
+  ],
+  "DOR": [
+    "IASMIN"
+  ],
+  "ENDOCRINOLOGIA": [
+    "ANDRE PANTALEAO"
+  ],
+  "ENDOSCOPIA": [
+    "ALFREDO GABRIEL",
+    "LUIS BAZAN",
+    "CAIO TACITO",
+    "JULIANA ROSSETO",
+    "THALITA DE LIMA"
+  ],
+  "GASTROENTEROLOGIA": [],
+  "GINECOLOGIA E OBSTETRÍCIA": [
+    "CAMED HM"
+  ],
+  "ORTOPEDIA E TRAUMATOLOGIA": [
+    "MEDTRAUMA"
+  ],
+  "HEMATOLOGIA": [
+    "RENILZA FELIZOLA",
+    "ANDREA GIORDANA"
+  ],
+  "INFECTOLOGIA": [
+    "ALYSSON BRUNO",
+    "LUIS GALAN",
+    "DOMINGOS SAVIO",
+    "JANIO NATROT",
+    "ROBERTO CARLOS"
+  ],
+  "NEFROLOGIA": [
+    "KATHERINE WILT",
+    "RUDOLF WILT",
+    "ALEX FÁBIO",
+    "HAROLDO SOUTO",
+    "FABRICIO LESSA"
+  ],
+  "NEUROCIRURGIA": [
+    "GRUPO"
+  ],
+  "NEUROLOGIA": [
+    "ANA ROSA",
+    "FELIPE",
+    "LIVIA",
+    "RAISA"
+  ],
+  "OFTALMOLOGIA": [
+    "MARCELO MOREIRA",
+    "NAIANE RAMOS",
+    "GUSTAVO HENRIQUE",
+    "JOSELITO SANTOS",
+    "BURNA CAMISA",
+    "TARIANA BANDEIRA"
+  ],
+  "ONCOLOGIA CLÍNICA": [
+    "GRUPO"
+  ],
+  "OTORRINOLARINGOLOGIA": [
+    "MAYRON DUARTE",
+    "LUIS SERRANO",
+    "ANTENOR RODRIGUES"
+  ],
+  "PNEUMOLOGIA": [
+    "JUCINEIDE",
+    "RAPHAEL VITOR"
+  ],
+  "PSIQUIATRIA": [
+    "JOEL GONZAGA",
+    "WASHINGTON LUIZ",
+    "HUMBERTO CALDAS",
+    "MATHEUS CALDAS",
+    "KIMÃ BARBOSA",
+    "LUCIVALDO FREIRE",
+    "MARCOS VINICIUS",
+    "CAIO SILVEIRA"
+  ],
+  "RADIOLOGIA": [
+    "DANIEL LOPES",
+    "JULIANO MEDEIROS",
+    "LEOMAR VIEIRA",
+    "PAULO EMERICK",
+    "CAMILO BOTELHO",
+    "MARCELO BOTELHO",
+    "JEAN CARLOS",
+    "LARISSA LAGO",
+    "DANIEL AZEVEDO"
+  ],
+  "RADIOTERAPIA": [
+    "NATALIA"
+  ],
+  "REUMATOLOGIA": [
+    "BRUNO LEITÃO"
+  ],
+  "TRATAMENTO DE FERIDAS": [
+    "JANIO NATROT"
+  ],
+  "UROLOGIA": [
+    "ARTHUR",
+    "RAUL",
+    "MARLON",
+    "FARIEL",
+    "MARCOS",
+    "FRANCISCO CHAGAS",
+    "CHICOLA"
+  ],
+  "ULTRASSONOGRAFIA": [
+    "JULIO HEREDIA",
+    "DWILLIO MENEZES",
+    "YAGO MAGRINI",
+    "MARCELLO ARAÚJO",
+    "LUIS ENRIQUE BERMEJO"
+  ],
+  "ULTRASSONOGRAFIA DOPPLER": [
+    "DWILLIO MENEZES",
+    "CAIO VITTOR"
+  ]
+};
 
 // Apelidos comuns -> palavra que aparece na opção da lista.
 const SINONIMOS = {
@@ -149,4 +397,21 @@ export function regraCardiologia(lido, escolhida, opcoes) {
   const parecer = opcoes.find(o => /^CARDIOLOGIA PARECER/.test(normalizar(o)));
   if (/RISCO|PRE ?OPERATORIO|PREOP|CIRURGIC/.test(normalizar(lido))) return risco || escolhida;
   return parecer || escolhida;
+}
+
+// Blocos: casa "BLOCO E" com "BLOCO E - BLE", "UTI 3" com "UTI 3", "SUTURA" com "PSFE - SUTURA".
+export function melhorBloco(lido, opcoes) {
+  const n = normalizar(lido);
+  if (!n) return null;
+  const exata = opcoes.find(o => normalizar(o) === n);
+  if (exata) return exata;
+  let m = n.match(/\bBLOCO ([A-F])\s?(\d)?\b/) || n.match(/\bBL([A-F])(\d)?\b/);
+  if (m) {
+    const alvo = 'BLOCO ' + m[1] + (m[2] || '');
+    return opcoes.find(o => normalizar(o).startsWith(alvo + ' ')) || opcoes.find(o => normalizar(o).startsWith(alvo)) || null;
+  }
+  m = n.match(/\bUTI ?(\d) ?([A-C])?\b/);
+  if (m) return opcoes.find(o => normalizar(o).replace(/ /g, '') === ('UTI' + m[1] + (m[2] || ''))) || null;
+  if (/\bUCO\b|UTI CARDIO|CORONARIANA/.test(n)) return opcoes.find(o => /UCO/.test(normalizar(o))) || null;
+  return melhorOpcao(lido, opcoes, 0.6);
 }

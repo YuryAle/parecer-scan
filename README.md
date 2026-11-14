@@ -24,7 +24,11 @@ Em **Ajustes**:
 3. **Salvar e enviar** → escolha o WhatsApp do médico (vai em PDF ou imagem).
 4. No fim do plantão: **Planilha** → *Copiar* → no Google Sheets, clique na 1ª célula vazia da coluna **DATA** e cole com **Ctrl+Shift+V**.
 
-Colunas copiadas, nesta ordem: `DATA, HORA, PACIENTE, HOSPITAL, BLOCO, LEITO, ESPECIALIDADE, MÉDICO, TIPO, COLABORADOR`.
+Ordem das colunas ao copiar (escolha em Ajustes → Modelo da planilha):
+- **Acionamento Parecer** (padrão): `DATA, HORA, ESPECIALIDADE, MÉDICO, PACIENTE, BLOCO, LEITO, CIENTE, ADMINISTRADOR`
+- **CAMED Escala**: `DATA, HORA, PACIENTE, HOSPITAL, BLOCO, LEITO, ESPECIALIDADE, MÉDICO, TIPO, COLABORADOR`
+
+As listas de especialidades, blocos e médicos vêm da planilha PARECER CAMED (aba Cadastro e listas suspensas).
 
 ## Privacidade
 

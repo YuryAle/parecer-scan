@@ -2,11 +2,13 @@ import * as db from './db.js';
 import * as scan from './scan.js';
 import { lerComGemini, lerNoCelular, escolherModelo } from './ai.js';
 import { jpegParaPdf } from './pdf.js';
-import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, melhorOpcao, normalizar, textoParaLista, regraCardiologia } from './lists.js';
+import { ESPECIALIDADES_PADRAO, BLOCOS_PADRAO, HOSPITAIS_PADRAO, VERSAO_LISTAS, MEDICOS_PADRAO, melhorBloco, melhorOpcao, normalizar, textoParaLista, regraCardiologia } from './lists.js';
 
 // ================= Configurações =================
 const PADRAO = {
+  modeloPlanilha: 'acionamento', // acionamento | camed
   colaborador: '',
+  ciente: 'CIENTE',
   hospital: '',
   tipo: 'PARECER',
   chave: '',
@@ -24,6 +26,7 @@ const salvarCfg = () => localStorage.setItem('cfg', JSON.stringify(cfg));
 if ((cfg.versaoListas || 1) < VERSAO_LISTAS) {
   // listas padrão novas (vindas da planilha) substituem as antigas
   cfg.especialidades = ESPECIALIDADES_PADRAO;
+  cfg.blocos = BLOCOS_PADRAO;
   cfg.versaoListas = VERSAO_LISTAS;
   salvarCfg();
 }
@@ -46,9 +49,17 @@ function aviso(msg, ms = 2600) {
   clearTimeout(tempoAviso); tempoAviso = setTimeout(() => a.classList.remove('mostra'), ms);
 }
 
-const COLUNAS = ['DATA', 'HORA', 'PACIENTE', 'HOSPITAL', 'BLOCO', 'LEITO', 'ESPECIALIDADE', 'MÉDICO', 'TIPO', 'COLABORADOR'];
-const linhaPlanilha = p => [p.data, p.hora, p.paciente, p.hospital, p.bloco, p.leito, p.especialidade, p.medico, p.tipo, p.colaborador]
-  .map(v => String(v ?? '').replace(/[\t\r\n]+/g, ' ').trim());
+// Ordem das colunas de cada planilha
+const MODELOS = {
+  acionamento: [['DATA', 'data'], ['HORA', 'hora'], ['ESPECIALIDADE', 'especialidade'], ['MÉDICO', 'medico'], ['PACIENTE', 'paciente'],
+    ['BLOCO', 'bloco'], ['LEITO', 'leito'], ['CIENTE', 'ciente'], ['ADMINISTRADOR', 'colaborador']],
+  camed: [['DATA', 'data'], ['HORA', 'hora'], ['PACIENTE', 'paciente'], ['HOSPITAL', 'hospital'], ['BLOCO', 'bloco'], ['LEITO', 'leito'],
+    ['ESPECIALIDADE', 'especialidade'], ['MÉDICO', 'medico'], ['TIPO', 'tipo'], ['COLABORADOR', 'colaborador']],
+};
+const colunas = () => MODELOS[cfg.modeloPlanilha] || MODELOS.acionamento;
+const linhaPlanilha = p => colunas().map(([, k]) => String(p[k] ?? '').replace(/[\t\r\n]+/g, ' ').trim());
+const nomeColaborador = () => cfg.modeloPlanilha === 'camed' ? 'Colaborador' : 'Administrador';
+const medicosDe = esp => MEDICOS_PADRAO[esp] || [...new Set(Object.values(MEDICOS_PADRAO).flat())].sort();
 
 const nomePasta = p => p.especialidade || 'SEM ESPECIALIDADE';
 
@@ -94,7 +105,7 @@ async function telaInicio() {
   const deHoje = todos.filter(p => p.data === hoje);
   const pendentes = todos.filter(p => !p.copiado).length;
   const falta = [];
-  if (!cfg.colaborador) falta.push('seu nome (colaborador)');
+  if (!cfg.colaborador) falta.push('seu nome (administrador)');
   if (cfg.modoLeitura === 'gemini' && !cfg.chave) falta.push('a chave do Gemini');
 
   tela.innerHTML = `
@@ -216,7 +227,7 @@ function novoRegistro() {
     criadoEm: d.getTime(),
     data: dataBR(d), hora: horaBR(d),
     paciente: '', hospital: cfg.hospital, bloco: '', leito: '',
-    especialidade: '', medico: '', tipo: cfg.tipo, colaborador: cfg.colaborador,
+    especialidade: '', medico: '', tipo: cfg.tipo, colaborador: cfg.colaborador, ciente: cfg.ciente,
     copiado: false,
   };
 }
@@ -239,16 +250,20 @@ function formularioHTML(p) {
       <label class="campo"><span>Data</span><input type="text" name="data" value="${esc(p.data)}" inputmode="numeric"></label>
       <label class="campo"><span>Hora</span><input type="text" name="hora" value="${esc(p.hora)}" inputmode="numeric"></label>
     </div>
-    <div class="dupla">
+    ${cfg.modeloPlanilha === 'camed' ? `<div class="dupla">
       <label class="campo"><span>Hospital</span><input type="text" name="hospital" list="dl-hosp" value="${esc(p.hospital)}" autocapitalize="characters"></label>
       <label class="campo"><span>Tipo</span><input type="text" name="tipo" value="${esc(p.tipo)}" autocapitalize="characters"></label>
+    </div>` : ''}
+    <label class="campo"><span>Médico (pode deixar em branco)</span><input type="text" name="medico" list="dl-med" value="${esc(p.medico)}" autocapitalize="characters"></label>
+    <div class="dupla">
+      ${cfg.modeloPlanilha === 'camed' ? '' : `<label class="campo"><span>Ciente</span><input type="text" name="ciente" list="dl-ciente" value="${esc(p.ciente ?? '')}" autocapitalize="characters"></label>`}
+      <label class="campo"><span>${nomeColaborador()}</span><input type="text" name="colaborador" value="${esc(p.colaborador)}" autocapitalize="characters"></label>
     </div>
-    <label class="campo"><span>Médico (pode deixar em branco)</span><input type="text" name="medico" value="${esc(p.medico)}" autocapitalize="characters"></label>
-    <label class="campo"><span>Colaborador</span><input type="text" name="colaborador" value="${esc(p.colaborador)}" autocapitalize="characters"></label>
-    ${dl('dl-esp', cfg.especialidades)}${dl('dl-bloco', cfg.blocos)}${dl('dl-hosp', cfg.hospitais)}`;
+    ${dl('dl-esp', cfg.especialidades)}${dl('dl-bloco', cfg.blocos)}${dl('dl-hosp', cfg.hospitais)}${dl('dl-ciente', ['CIENTE', 'NÃO CIENTE'])}
+    <datalist id="dl-med">${medicosDe(p.especialidade).map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
 }
 
-const MAIUSCULAS = new Set(['paciente', 'especialidade', 'bloco', 'hospital', 'tipo', 'medico', 'colaborador']);
+const MAIUSCULAS = new Set(['paciente', 'especialidade', 'bloco', 'hospital', 'tipo', 'medico', 'colaborador', 'ciente']);
 
 function ligarFormulario(raiz, p, aoMudar) {
   const checar = nome => {
@@ -265,8 +280,14 @@ function ligarFormulario(raiz, p, aoMudar) {
     });
     inp.addEventListener('blur', () => { inp.value = p[inp.name] ?? ''; });
   });
+  const atualizarMedicos = () => {
+    const dl = raiz.querySelector('#dl-med');
+    if (dl) dl.innerHTML = medicosDe(p.especialidade).map(o => `<option value="${esc(o)}">`).join('');
+  };
+  raiz.querySelector('[name=especialidade]')?.addEventListener('input', atualizarMedicos);
   checar('especialidade'); checar('bloco');
   return () => {
+    atualizarMedicos();
     raiz.querySelectorAll('input[name]').forEach(inp => { inp.value = p[inp.name] ?? ''; });
     checar('especialidade'); checar('bloco');
   };
@@ -345,7 +366,7 @@ function aplicarLeitura(r) {
   const esp = melhorOpcao(r.especialidade_lida, cfg.especialidades, 0.99) || melhorOpcao(r.especialidade, cfg.especialidades, 0.8) || melhorOpcao(r.especialidade_lida, cfg.especialidades)
     || (r.especialidade_lida || '').toUpperCase().trim();
   const espFinal = regraCardiologia(r.especialidade_lida, esp, cfg.especialidades);
-  const bloco = melhorOpcao(r.bloco, cfg.blocos, 0.8) || melhorOpcao(r.setor_lido, cfg.blocos, 0.6) || '';
+  const bloco = melhorBloco(r.bloco, cfg.blocos) || melhorBloco(r.setor_lido, cfg.blocos) || '';
   const novos = {
     paciente: (r.paciente || '').toUpperCase().replace(/\s+/g, ' ').trim(),
     especialidade: espFinal,
@@ -419,7 +440,7 @@ async function telaPlanilha() {
     <button class="btn cheio verde" id="copiar">📋 Copiar ${linhas.length} linha(s)</button>
     <p class="suave pequeno">No Google Sheets, clique na 1ª célula vazia da coluna <b>DATA</b> e cole com <b>Ctrl+Shift+V</b>.</p>
     <div class="tabela-wrap"><table>
-      <thead><tr>${COLUNAS.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+      <thead><tr>${colunas().map(([c]) => `<th>${c}</th>`).join('')}</tr></thead>
       <tbody>${linhas.map(p => `<tr data-id="${p.id}" class="${p.copiado ? 'copiado' : ''}">${linhaPlanilha(p).map(v => v ? `<td>${esc(v)}</td>` : '<td class="vazio">—</td>').join('')}</tr>`).join('')}</tbody>
     </table></div>
     <p class="suave pequeno">Toque numa linha para editar (ex.: colocar o médico).</p>`
@@ -537,10 +558,17 @@ async function telaConfig() {
   tela.innerHTML = `
     <div class="cartao">
       <h2>Plantão</h2>
-      <label class="campo"><span>Seu nome (coluna COLABORADOR)</span><input type="text" id="c-colab" value="${esc(cfg.colaborador)}" autocapitalize="characters" placeholder="Ex.: YURY ALEXANDRO"></label>
+      <label class="campo"><span>Modelo da planilha (ordem das colunas ao copiar)</span>
+        <select id="c-modelo">
+          <option value="acionamento">Acionamento Parecer: Data, Hora, Especialidade, Médico, Paciente, Bloco, Leito, Ciente, Administrador</option>
+          <option value="camed">CAMED Escala: Data, Hora, Paciente, Hospital, Bloco, Leito, Especialidade, Médico, Tipo, Colaborador</option>
+        </select></label>
+      <label class="campo"><span>Seu nome (coluna ADMINISTRADOR / COLABORADOR)</span><input type="text" id="c-colab" value="${esc(cfg.colaborador)}" autocapitalize="characters" placeholder="Ex.: YURY ALEXANDRO"></label>
       <label class="campo"><span>Hospital padrão (pode deixar vazio)</span><input type="text" id="c-hosp" list="dl-h" value="${esc(cfg.hospital)}" autocapitalize="characters"></label>
       <datalist id="dl-h">${cfg.hospitais.map(h => `<option value="${esc(h)}">`).join('')}</datalist>
-      <label class="campo"><span>Tipo padrão</span><input type="text" id="c-tipo" value="${esc(cfg.tipo)}" autocapitalize="characters"></label>
+      <label class="campo"><span>Ciente padrão</span><input type="text" id="c-ciente" list="dl-ci" value="${esc(cfg.ciente)}" autocapitalize="characters"></label>
+      <datalist id="dl-ci"><option value="CIENTE"><option value="NÃO CIENTE"></datalist>
+      <label class="campo"><span>Tipo padrão (modelo CAMED)</span><input type="text" id="c-tipo" value="${esc(cfg.tipo)}" autocapitalize="characters"></label>
     </div>
 
     <div class="cartao">
@@ -590,6 +618,7 @@ async function telaConfig() {
     <p class="suave pequeno" style="text-align:center;margin-top:16px">Parecer Scan · os pareceres ficam só neste celular.</p>`;
 
   $('#c-modo').value = cfg.modoLeitura;
+  $('#c-modelo').value = cfg.modeloPlanilha;
   $('#c-env').value = cfg.formatoEnvio;
   $('#c-limpa').value = String(cfg.limpezaDias);
   const mostrarGemini = () => { $('#bloco-gemini').hidden = $('#c-modo').value !== 'gemini'; };
@@ -609,7 +638,9 @@ async function telaConfig() {
     const chaveNova = $('#c-chave').value.trim();
     if (chaveNova !== cfg.chave) cfg.modelo = '';
     Object.assign(cfg, {
+      modeloPlanilha: $('#c-modelo').value,
       colaborador: $('#c-colab').value.trim().toUpperCase(),
+      ciente: $('#c-ciente').value.trim().toUpperCase(),
       hospital: $('#c-hosp').value.trim().toUpperCase(),
       tipo: $('#c-tipo').value.trim().toUpperCase() || 'PARECER',
       modoLeitura: $('#c-modo').value,
