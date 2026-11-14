@@ -13,7 +13,7 @@ No app, as cópias em PDF ficam em **Documentos/CAMED Scan/ESPECIALIDADE**. Em *
 
 ### Lançar uma versão nova
 1. Aumente `VERSAO` em `js/versao.js` (ex.: 1.1.0 → 1.2.0).
-2. Crie a tag igual (`v1.2.0`) e envie. O GitHub gera o APK assinado e publica em *Releases*.
+2. Envie para a `main`. O GitHub gera o APK assinado e publica em *Releases* como `v1.2.0`.
 3. O segredo `SENHA_ASSINATURA` (Settings → Secrets and variables → Actions) precisa existir. A chave fica em `assinatura/camed-scan.p12`; sem a senha ela não serve. Não troque a chave, senão o celular não aceita a atualização por cima.
 
 ## Usar pelo navegador (site)
