@@ -25,6 +25,7 @@ const PADRAO = {
 };
 let cfg = { ...PADRAO, ...JSON.parse(localStorage.getItem('cfg') || '{}') };
 const salvarCfg = () => localStorage.setItem('cfg', JSON.stringify(cfg));
+if ((cfg.versaoModelo || 1) < 2) { cfg.modelo = ''; cfg.versaoModelo = 2; salvarCfg(); } // passa a usar o Flash-Lite
 if ((cfg.versaoListas || 1) < VERSAO_LISTAS) {
   // listas padrão novas (vindas da planilha) substituem as antigas
   cfg.especialidades = ESPECIALIDADES_PADRAO;
@@ -381,6 +382,7 @@ async function lerDados() {
   if (cfg.modoLeitura === 'manual') { statusIA(['', 'Leitura automática desligada. Preencha os campos.']); return; }
   if (cfg.modoLeitura === 'gemini' && !cfg.chave) { statusIA(['erro', 'Sem chave do Gemini. Preencha à mão ou configure em Ajustes.']); return; }
   statusIA(['', '<span class="carregando"></span> Lendo o parecer…']);
+  const inicio = performance.now();
   try {
     const canvas = fluxo.final || montarFinal();
     const r = cfg.modoLeitura === 'gemini' ? await lerComGemini(canvas, cfg) : await lerNoCelular(canvas);
@@ -392,7 +394,8 @@ async function lerDados() {
       return lerDados();
     }
     aplicarLeitura(r);
-    statusIA(['ok', '✓ Dados lidos. Confira antes de salvar.']);
+    const seg = ((performance.now() - inicio) / 1000).toFixed(1).replace('.', ',');
+    statusIA(['ok', `✓ Dados lidos em ${seg} s. Confira antes de salvar.`]);
   } catch (err) {
     console.error(err);
     statusIA(['erro', esc(err.message || 'Não consegui ler.') + ' Preencha à mão se precisar.']);

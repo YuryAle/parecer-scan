@@ -14,7 +14,7 @@ async function blobBase64(blob) {
 export function recorteParaIA(canvas, soTopo) {
   const fracao = soTopo ? 0.37 : 1;
   const sh = Math.round(canvas.height * fracao);
-  const k = Math.min(1, 1400 / canvas.width);
+  const k = Math.min(1, 1200 / canvas.width);
   const c = novoCanvas(canvas.width * k, sh * k);
   c.getContext('2d').drawImage(canvas, 0, 0, canvas.width, sh, 0, 0, c.width, c.height);
   return c;
@@ -27,10 +27,13 @@ export async function escolherModelo(chave) {
   const nomes = models
     .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map(m => m.name.replace('models/', ''));
+  // Flash-Lite: o mais rápido para ler o cabeçalho (sem "pensar" demais)
+  if (nomes.includes('gemini-flash-lite-latest')) return 'gemini-flash-lite-latest';
+  const versao = n => parseFloat(n.split('-')[1]) || 0;
+  const lite = nomes.filter(n => /^gemini-\d+(\.\d+)?-flash-lite$/.test(n)).sort((a, b) => versao(b) - versao(a));
+  if (lite.length) return lite[0];
   if (nomes.includes('gemini-flash-latest')) return 'gemini-flash-latest';
-  const estaveis = nomes
-    .filter(n => /^gemini-\d+(\.\d+)?-flash$/.test(n))
-    .sort((a, b) => parseFloat(b.split('-')[1]) - parseFloat(a.split('-')[1]));
+  const estaveis = nomes.filter(n => /^gemini-\d+(\.\d+)?-flash$/.test(n)).sort((a, b) => versao(b) - versao(a));
   if (estaveis.length) return estaveis[0];
   const qualquer = nomes.find(n => n.includes('flash') && !/(image|tts|audio|live|embed)/.test(n));
   if (qualquer) return qualquer;
@@ -87,13 +90,22 @@ ${cfg.blocos.join('\n')}`;
 
   const corpo = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
-    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: ESQUEMA },
+    generationConfig: {
+      temperature: 0, responseMimeType: 'application/json', responseSchema: ESQUEMA,
+      thinkingConfig: { thinkingLevel: 'minimal' }, // responde rápido, sem raciocínio longo
+    },
   };
-  const r = await fetch(`${API}/models/${modelo}:generateContent`, {
+  const enviar = () => fetch(`${API}/models/${modelo}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.chave },
     body: JSON.stringify(corpo),
   });
+  let r = await enviar();
+  if (r.status === 400) {
+    // modelo que não aceita o nível de raciocínio: tenta sem ele
+    const txt = await r.clone().text();
+    if (/thinking/i.test(txt)) { delete corpo.generationConfig.thinkingConfig; r = await enviar(); }
+  }
   if (r.status === 404 && cfg.modelo) {
     // modelo salvo saiu do ar: escolhe outro e tenta de novo
     return lerComGemini(canvas, { ...cfg, modelo: '' });
